@@ -8,10 +8,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Unzip Include Folder
+        run: |
+          if [ -f "include.zip" ]; then
+            unzip include.zip
+          fi
+
       - name: Compile Pawn Script
-        uses: Southclaws/pawnctl-action@master
+        uses: pawn-lang/compiler-action@v1
         with:
-          input: 'modernhudrp.pwn'
+          entrypoint: 'modernhudrp.pwn'
           output: 'modernhudrp.amx'
           include: 'include'
 
