@@ -1,0 +1,23 @@
+name: Pawn Compiler Online
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile Pawn Script
+        uses: Southclaws/pawnctl-action@master
+        with:
+          input: 'modernhudrp.pwn'
+          output: 'modernhudrp.amx'
+          include: 'include'
+
+      - name: Upload AMX Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-amx
+          path: modernhudrp.amx
+          
