@@ -1,20 +1,14 @@
 #include <a_samp>
 #include <progress2>
 
-// =============================================================================
-// DEFINISI & VARIABEL
-// =============================================================================
-#define DIALOG_HUD_SETUP 9923
-
 // Variabel untuk Player TextDraw (Status Bar)
 new PlayerBar:BarDarah[MAX_PLAYERS];
 new PlayerBar:BarArmor[MAX_PLAYERS];
 new PlayerBar:BarMakan[MAX_PLAYERS];
 new PlayerBar:BarMinum[MAX_PLAYERS];
 
-// Variabel TextDraw Background dan Ikon Status
+// Variabel TextDraw Background
 new PlayerText:HudBackground[MAX_PLAYERS];
-new PlayerText:StatusIcons[MAX_PLAYERS];
 
 // Variabel Indikator Mic (Suara Roleplay)
 new PlayerText:MicIndicator[MAX_PLAYERS];
@@ -25,7 +19,6 @@ new PlayerVoiceRange[MAX_PLAYERS]; // 0: Bisik, 1: Normal, 2: Teriak
 new PlayerText:SpeedoBG[MAX_PLAYERS];
 new PlayerText:SpeedoText[MAX_PLAYERS];
 new PlayerText:SpeedoUnit[MAX_PLAYERS];
-new PlayerText:FuelText[MAX_PLAYERS];
 new PlayerBar:BarBensin[MAX_PLAYERS];
 
 // Variabel Status Kebutuhan Player (0 - 100)
@@ -35,16 +28,8 @@ new PlayerMinum[MAX_PLAYERS] = {100, ...};
 // Timer untuk update HUD otomatis
 new HudUpdateTimer;
 
-// =============================================================================
-// CALLBACKS UTAMA
-// =============================================================================
-
 public OnGameModeInit()
 {
-    // Mengubah radar/map bawaan game menjadi BULAT (Sesuai Request)
-    // Catatan: Di SA-MP, radar kotak bawaan GTA SA diubah melingkar melalui konfigurasi ini
-    SetGridlineRadar(0); 
-    
     // Jalankan timer update status & speedo setiap 1 detik
     HudUpdateTimer = SetTimer("UpdateAllPlayerHUD", 1000, true);
     return 1;
@@ -58,12 +43,10 @@ public OnGameModeExit()
 
 public OnPlayerConnect(playerid)
 {
-    // Default range suara saat masuk server: Normal
     PlayerVoiceRange[playerid] = 1;
     PlayerMakan[playerid] = 100;
     PlayerMinum[playerid] = 100;
     
-    // Inisialisasi TextDraw HUD saat player masuk
     CreatePlayerModernHUD(playerid);
     return 1;
 }
@@ -76,19 +59,16 @@ public OnPlayerDisconnect(playerid, reason)
 
 public OnPlayerSpawn(playerid)
 {
-    // Tampilkan semua komponen HUD ke layar player
     ShowPlayerModernHUD(playerid);
     return 1;
 }
 
 public OnPlayerStateChange(playerid, newstate, oldstate)
 {
-    // Jika player masuk ke kendaraan (driver atau penumpang)
     if(newstate == PLAYER_STATE_DRIVER || newstate == PLAYER_STATE_PASSENGER)
     {
         ShowPlayerSpeedometer(playerid);
     }
-    // Jika player keluar dari kendaraan
     if(oldstate == PLAYER_STATE_DRIVER || oldstate == PLAYER_STATE_PASSENGER)
     {
         HidePlayerSpeedometer(playerid);
@@ -96,96 +76,67 @@ public OnPlayerStateChange(playerid, newstate, oldstate)
     return 1;
 }
 
-// Menangkap tombol 'H' untuk mengubah range Mic suara
 public OnPlayerKeyStateChange(playerid, newkeys, oldkeys)
 {
-    if((newkeys & KEY_CTRL_BACK) && IsPlayerSpawned(playerid)) // Tombol H / CapsLock dasar
+    if((newkeys & KEY_CTRL_BACK) && IsPlayerSpawned(playerid)) 
     {
         PlayerVoiceRange[playerid]++;
         if(PlayerVoiceRange[playerid] > 2) PlayerVoiceRange[playerid] = 0;
         
         UpdateMicHUD(playerid);
-        PlayerPlaySound(playerid, 1052, 0.0, 0.0, 0.0); // Suara klik radio ceria
+        PlayerPlaySound(playerid, 1052, 0.0, 0.0, 0.0); 
     }
     return 1;
 }
 
-// =============================================================================
-// FUNGSI BUAT & TAMPILKAN HUD (TEXTDRAW & PROGRESS BAR)
-// =============================================================================
-
 stock CreatePlayerModernHUD(playerid)
 {
-    // 1. Background Kotak Transparan untuk Status Bar (Kiri Bawah di samping Map Bulat)
+    // Background Kotak Transparan untuk Status Bar Kiri Bawah
     HudBackground[playerid] = CreatePlayerTextDraw(playerid, 150.0000, 430.0000, "LD_SPAC:white");
     PlayerTextDrawLetterSize(playerid, HudBackground[playerid], 0.0000, 0.0000);
     PlayerTextDrawTextSize(playerid, HudBackground[playerid], 120.0000, 25.0000);
     PlayerTextDrawAlignment(playerid, HudBackground[playerid], 1);
-    PlayerTextDrawColor(playerid, HudBackground[playerid], 150); // Transparan gelap ala FiveM
+    PlayerTextDrawColor(playerid, HudBackground[playerid], 150); 
     PlayerTextDrawSetShadow(playerid, HudBackground[playerid], 0);
     PlayerTextDrawSetOutline(playerid, HudBackground[playerid], 0);
     PlayerTextDrawFont(playerid, HudBackground[playerid], 4);
 
-    // 2. Progres Bar Darah (Warna Hijau Cerah)
+    // Progres Bar Kebutuhan Fisik
     BarDarah[playerid] = CreatePlayerProgressBar(playerid, 155.0, 433.0, 20.0, 4.0, 0xFF0000FF, 100.0, BAR_DIRECTION_RIGHT);
-    
-    // 3. Progres Bar Armor/Vest (Warna Biru Gendarmerie)
     BarArmor[playerid] = CreatePlayerProgressBar(playerid, 180.0, 433.0, 20.0, 4.0, 0x0088FFFF, 100.0, BAR_DIRECTION_RIGHT);
-    
-    // 4. Progres Bar Makanan (Warna Oranye)
     BarMakan[playerid] = CreatePlayerProgressBar(playerid, 205.0, 433.0, 20.0, 4.0, 0xFF8800FF, 100.0, BAR_DIRECTION_RIGHT);
-    
-    // 5. Progres Bar Minuman (Warna Sian/Aqua)
     BarMinum[playerid] = CreatePlayerProgressBar(playerid, 230.0, 433.0, 20.0, 4.0, 0x00FFFFFF, 100.0, BAR_DIRECTION_RIGHT);
 
-    // 6. Pembuatan Indikator Mic (Kiri bawah, di samping status bar)
-    MicBackground(playerid);
-    
-    // 7. Pembuatan Struktur Speedometer (Kanan Bawah)
-    CreatePlayerSpeedoDraw(playerid);
-    return 1;
-}
-
-stock MicBackground(playerid)
-{
+    // Indikator Mic
     MicIndicator[playerid] = CreatePlayerTextDraw(playerid, 125.0000, 431.0000, "I");
     PlayerTextDrawFont(playerid, MicIndicator[playerid], 1);
     PlayerTextDrawLetterSize(playerid, MicIndicator[playerid], 0.5, 1.5);
-    PlayerTextDrawColor(playerid, MicIndicator[playerid], 0x00FF00FF); // Default Hijau aktif
+    PlayerTextDrawColor(playerid, MicIndicator[playerid], 0x00FF00FF);
 
     MicText[playerid] = CreatePlayerTextDraw(playerid, 110.0000, 433.0000, "NORMAL");
     PlayerTextDrawFont(playerid, MicText[playerid], 2);
     PlayerTextDrawLetterSize(playerid, MicText[playerid], 0.18, 0.9);
     PlayerTextDrawColor(playerid, MicText[playerid], 0xFFFFFFFF);
-}
-
-stock CreatePlayerSpeedoDraw(playerid)
-{
-    // Background Hitam Melingkar Ringan untuk Angka Kecepatan
+    
+    // Speedometer Kanan Bawah
     SpeedoBG[playerid] = CreatePlayerTextDraw(playerid, 510.0000, 390.0000, "LD_SPAC:white");
     PlayerTextDrawTextSize(playerid, SpeedoBG[playerid], 110.0000, 50.0000);
     PlayerTextDrawColor(playerid, SpeedoBG[playerid], 120);
     PlayerTextDrawFont(playerid, SpeedoBG[playerid], 4);
 
-    // Teks Angka Speedometer 000
     SpeedoText[playerid] = CreatePlayerTextDraw(playerid, 550.0000, 395.0000, "000");
-    PlayerTextDrawFont(playerid, SpeedoText[playerid], 3); // Font bergaya sport/bold
+    PlayerTextDrawFont(playerid, SpeedoText[playerid], 3); 
     PlayerTextDrawLetterSize(playerid, SpeedoText[playerid], 0.55, 2.4);
     PlayerTextDrawColor(playerid, SpeedoText[playerid], 0xFFFFFFFF);
 
-    // Teks KM/H
     SpeedoUnit[playerid] = CreatePlayerTextDraw(playerid, 553.0000, 420.0000, "KMH");
     PlayerTextDrawFont(playerid, SpeedoUnit[playerid], 2);
     PlayerTextDrawLetterSize(playerid, SpeedoUnit[playerid], 0.17, 0.8);
     PlayerTextDrawColor(playerid, SpeedoUnit[playerid], 0xAAAAAAFF);
 
-    // Bar Indikator Bensin Mini di Bawah Angka Speedo
     BarBensin[playerid] = CreatePlayerProgressBar(playerid, 520.0, 433.0, 90.0, 3.0, 0xFFFF00FF, 100.0, BAR_DIRECTION_RIGHT);
+    return 1;
 }
-
-// =============================================================================
-// LOGIKA MENAMPILKAN / MENYEMBUNYIKAN
-// =============================================================================
 
 stock ShowPlayerModernHUD(playerid)
 {
@@ -233,10 +184,6 @@ stock HidePlayerSpeedometer(playerid)
     HidePlayerProgressBar(playerid, BarBensin[playerid]);
 }
 
-// =============================================================================
-// ENGINES & SISTEM UPDATE DATA OTOMATIS
-// =============================================================================
-
 forward UpdateAllPlayerHUD();
 public UpdateAllPlayerHUD()
 {
@@ -244,18 +191,15 @@ public UpdateAllPlayerHUD()
     {
         if(!IsPlayerConnected(i) || !IsPlayerSpawned(i)) continue;
         
-        // 1. Ambil Data Darah (Health) Asli
         new Float:hp;
         GetPlayerHealth(i, hp);
         SetPlayerProgressBarValue(i, BarDarah[i], hp);
         
-        // 2. Ambil Data Vest (Armour) Asli
         new Float:arm;
         GetPlayerArmour(i, arm);
         SetPlayerProgressBarValue(i, BarArmor[i], arm);
         
-        // 3. Update Bar Lapar dan Haus (Kebutuhan Roleplay)
-        PlayerMakan[i] -= 1; // Berkurang perlahan tiap waktu
+        PlayerMakan[i] -= 1; 
         PlayerMinum[i] -= 1;
         if(PlayerMakan[i] < 0) PlayerMakan[i] = 0;
         if(PlayerMinum[i] < 0) PlayerMinum[i] = 0;
@@ -263,20 +207,17 @@ public UpdateAllPlayerHUD()
         SetPlayerProgressBarValue(i, BarMakan[i], Float:PlayerMakan[i]);
         SetPlayerProgressBarValue(i, BarMinum[i], Float:PlayerMinum[i]);
         
-        // Refresh Bar agar visualnya bergeser
         UpdatePlayerProgressBar(i, BarDarah[i]);
         UpdatePlayerProgressBar(i, BarArmor[i]);
         UpdatePlayerProgressBar(i, BarMakan[i]);
         UpdatePlayerProgressBar(i, BarMinum[i]);
         
-        // 4. Update Angka Speedometer jika di dalam Mobil
         if(IsPlayerInAnyVehicle(i))
         {
             new string[8];
             valstr(string, GetPlayerSpeed(i));
             PlayerTextDrawSetString(i, SpeedoText[i], string);
             
-            // Set bensin statis di angka 80% untuk simulasi visual HUD
             SetPlayerProgressBarValue(i, BarBensin[i], 80.0);
             UpdatePlayerProgressBar(i, BarBensin[i]);
         }
@@ -286,27 +227,25 @@ public UpdateAllPlayerHUD()
 
 stock UpdateMicHUD(playerid)
 {
-    // Mengubah indikator mic berdasarkan range tombol H
-    if(PlayerVoiceRange[playerid] == 0) // Bisik
+    if(PlayerVoiceRange[playerid] == 0)
     {
         PlayerTextDrawSetString(playerid, MicText[playerid], "WHISPER");
-        PlayerTextDrawColor(playerid, MicIndicator[playerid], 0xFFFF00FF); // Kuning redup
+        PlayerTextDrawColor(playerid, MicIndicator[playerid], 0xFFFF00FF);
     }
-    else if(PlayerVoiceRange[playerid] == 1) // Normal
+    else if(PlayerVoiceRange[playerid] == 1)
     {
         PlayerTextDrawSetString(playerid, MicText[playerid], "NORMAL");
-        PlayerTextDrawColor(playerid, MicIndicator[playerid], 0x00FF00FF); // Hijau
+        PlayerTextDrawColor(playerid, MicIndicator[playerid], 0x00FF00FF);
     }
-    else if(PlayerVoiceRange[playerid] == 2) // Teriak
+    else if(PlayerVoiceRange[playerid] == 2)
     {
         PlayerTextDrawSetString(playerid, MicText[playerid], "SHOUT");
-        PlayerTextDrawColor(playerid, MicIndicator[playerid], 0xFF0000FF); // Merah membara
+        PlayerTextDrawColor(playerid, MicIndicator[playerid], 0xFF0000FF);
     }
     PlayerTextDrawShow(playerid, MicIndicator[playerid]);
     PlayerTextDrawShow(playerid, MicText[playerid]);
 }
 
-// Fungsi pembantu menghitung kecepatan asli kendaraan ala SA-MP
 stock GetPlayerSpeed(playerid)
 {
     new Float:ST[3], Float:SpeedVF;
