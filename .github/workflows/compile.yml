@@ -8,6 +8,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install Setup Requirements
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip gcc-multilib
+
+      - name: Download Official Pawn Compiler
+        run: |
+          wget https://github.com/pawn-lang/compiler/releases/download/v3.10.10/pawnc-3.10.10-linux.tar.gz
+          tar -xvzf pawnc-3.10.10-linux.tar.gz
+          sudo cp pawnc-3.10.10-linux/bin/pawncc /usr/local/bin/
+          sudo chmod +x /usr/local/bin/pawncc
+
       - name: Unzip Include Folder
         run: |
           if [ -f "include.zip" ]; then
@@ -15,11 +27,8 @@ jobs:
           fi
 
       - name: Compile Pawn Script
-        uses: pawn-lang/compiler-action@v1
-        with:
-          entrypoint: 'modernhudrp.pwn'
-          output: 'modernhudrp.amx'
-          include: 'include'
+        run: |
+          pawncc modernhudrp.pwn -i=include -o=modernhudrp.amx
 
       - name: Upload AMX Result
         uses: actions/upload-artifact@v4
